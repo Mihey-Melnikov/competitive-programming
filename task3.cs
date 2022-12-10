@@ -21,7 +21,7 @@ public class ConcurrentStack<T> : IStack<T>
         var spinWait = new SpinWait();
         while (true)
         {
-            prevNode = _headNode;
+            var prevNode = _headNode;
             if (prevNode == null)
             {
                 item = default;
