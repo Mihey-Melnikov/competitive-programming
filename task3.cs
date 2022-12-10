@@ -19,21 +19,10 @@ public class ConcurrentStack<T> : IStack<T>
 
     public bool TryPop(out T? item)
     {
-        var prevNode = _headNode;
-        if (prevNode == null)
-        {
-            item = default;
-            return false;
-        }
-        if (Interlocked.CompareExchange(ref _headNode, prevNode.Next, prevNode) == prevNode)
-        {
-            item = prevNode.Value;
-            return true;
-        }
         var spinWait = new SpinWait();
         while (true)
         {
-            prevNode = _headNode;
+            var prevNode = _headNode;
             if (prevNode == null)
             {
                 item = default;
