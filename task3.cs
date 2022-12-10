@@ -6,16 +6,15 @@ public class ConcurrentStack<T> : IStack<T>
 
     public void Push(T item)
     {
-        var currentNode = new Node(item, _headNode, (_headNode?.Count ?? 0) + 1);
-        if (Interlocked.CompareExchange(ref _headNode, currentNode, currentNode.Next) == currentNode.Next)
-            return;
         var spinWait = new SpinWait();
-        do
+        while (true)
         {
+            var prevHead = _headNode;
+            var currentNode = new Node(item, prevHead, (prevHead?.Count ?? 0) + 1);
+            if (Interlocked.CompareExchange(ref _headNode, currentNode, prevHead) == prevHead)
+                return;
             spinWait.SpinOnce(-1);
-            currentNode.Next = _headNode;
         }
-        while (Interlocked.CompareExchange(ref _headNode, currentNode, currentNode.Next) != currentNode.Next);
     }
 
     public bool TryPop(out T? item)
