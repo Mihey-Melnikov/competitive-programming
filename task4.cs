@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading;
 
@@ -30,55 +30,40 @@ namespace CustomThreadPool
                 while (true)
                 {
                     Action currentAction = delegate { };
-                    while (_actionsDict[Thread.CurrentThread.ManagedThreadId].LocalPop(ref currentAction))
+                    if (_actionsDict[Thread.CurrentThread.ManagedThreadId].LocalPop(ref currentAction))
                         currentAction.Invoke();
                     
-                    var tryFlag = true;
-                    tryFlag = TryDequeueAndFindFlag(tryFlag);
+                    var tryFlag = TryDequeueAndFindFlag();
                     
                     if (!tryFlag)
-                        tryFlag = TryStealActionPool(tryFlag);
-                    if (!tryFlag)
-                        TryDequeueElseWait();
+                        tryFlag = TryStealActionPool();
                 }
             }
             RunBackgroundThreads(Worker, 16);
         }
 
-        private static bool TryDequeueAndFindFlag(bool flag)
+        private static bool TryDequeueAndFindFlag()
         {
             lock (_actionsQueue)
             {
                 if (_actionsQueue.TryDequeue(out var action))
                     _actionsDict[Thread.CurrentThread.ManagedThreadId].LocalPush(action);
                 else
-                    flag = false;
+                    return false;
             }
-            return flag;
+            return true;
         }
 
-        private static bool TryStealActionPool(bool flag)
+        private static bool TryStealActionPool()
         {
             foreach (var threadPool in _actionsDict)
             {
                 Action action = delegate { };
                 if (!threadPool.Value.TrySteal(ref action)) continue;
                 _actionsDict[Thread.CurrentThread.ManagedThreadId].LocalPush(action);
-                flag = true;
-                break;
+                return true;
             }
-            return flag;
-        }
-
-        private static void TryDequeueElseWait()
-        {
-            lock (_actionsQueue)
-            {
-                if (_actionsQueue.TryDequeue(out var action))
-                    _actionsDict[Thread.CurrentThread.ManagedThreadId].LocalPush(action);
-                else
-                    Monitor.Wait(_actionsQueue);
-            }
+            return false;
         }
 
         public static void AddAction(Action action)
@@ -86,7 +71,6 @@ namespace CustomThreadPool
             lock (_actionsQueue)
             {
                 _actionsQueue.Enqueue(action);
-                Monitor.Pulse(_actionsQueue);
             }
         }
 
